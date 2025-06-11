@@ -511,7 +511,275 @@ class JMN1KSCoords {
 
             gzero(vcon);
             DLOOP1 {
-                DLOOP2 vcon[mu] += rtrans[mu][nu] * vcon_bl[nu];
+                DLOOP2 vcon[mu] += trans[mu][nu] * vcon_bl[nu];
+            }
+        }
+    };
+
+/**
+ * SV coordinates in BL form
+ */
+class SVBLCoords {
+    public:
+        static constexpr char name[] = "SVBLCoords";
+        const GReal a;
+        const GReal def_l1;
+        static constexpr bool spherical = true;
+
+        KOKKOS_FUNCTION SVBLCoords(GReal spin, GReal l1): a(spin), def_l1(l1) {}
+    
+        KOKKOS_INLINE_FUNCTION void gcov_embed(const GReal Xembed[GR_DIM], Real gcov[GR_DIM][GR_DIM]) const
+        {
+            const GReal r = Xembed[1];
+            const GReal th = excise(excise(Xembed[2], 0.0, SMALL), M_PI, SMALL);
+            const GReal cth = m::cos(th), sth = m::sin(th);
+            const GReal s2 = sth * sth;
+
+            const GReal gtt =  (1. - 2./m::sqrt(r*r + def_l1*def_l1));
+            const GReal gg = 1.0;
+            const GReal gthth = r*r + def_l1*def_l1;
+
+            const GReal twoF = (1.0 / m::sqrt(gg) - (gtt / gg)) * gthth;
+            const GReal Delta = gthth * (gtt / gg) + a * a;
+            const GReal Sigma = gthth / m::sqrt(gg) + a * a * cth * cth;
+            const GReal PII = m::pow(gthth / m::sqrt(gg) + a * a, 2.0) - Delta * a * a * s2;
+    
+            gzero2(gcov);
+
+            gcov[0][0] = -(1. - twoF/Sigma);
+            gcov[0][3] = -twoF/Sigma*a*s2;
+            gcov[3][0] = -twoF/Sigma*a*s2;
+            gcov[1][1] = Sigma/Delta;
+            gcov[2][2] = Sigma;
+            gcov[3][3] = PII/Sigma*s2;
+        }
+};
+
+/**
+ * Simson-Visser (SV) coordinates in KS form
+ */
+class SVKSCoords {
+    public:
+        static constexpr char name[] = "SVKSCoords";
+        const GReal a;
+        const GReal def_l1;
+        static constexpr bool spherical = true;
+    
+        KOKKOS_FUNCTION SVKSCoords(GReal spin, GReal l1): a(spin), def_l1(l1) {}
+    
+        KOKKOS_INLINE_FUNCTION void gcov_embed(const GReal Xembed[GR_DIM], Real gcov[GR_DIM][GR_DIM]) const
+        {
+            const GReal r = Xembed[1];
+            const GReal th = excise(excise(Xembed[2], 0.0, SMALL), M_PI, SMALL);
+            const GReal cth = m::cos(th), sth = m::sin(th);
+            const GReal s2 = sth * sth;
+
+            const GReal gtt =  (1. - 2./m::sqrt(r*r + def_l1*def_l1));
+            const GReal gg = 1.0;
+            const GReal gthth = r*r + def_l1*def_l1;
+
+            const GReal twoF = (1.0 / m::sqrt(gg) - (gtt / gg)) * gthth;
+            const GReal Delta = gthth * (gtt / gg) + a * a;
+            const GReal Sigma = gthth / m::sqrt(gg) + a * a * cth * cth;
+            const GReal PII = m::pow(gthth / m::sqrt(gg) + a * a, 2.0) - Delta * a * a * s2;
+    
+            gzero2(gcov);
+    
+            gcov[0][0] = -(1.0 - twoF / Sigma);
+            gcov[0][1] = twoF / Sigma;
+            gcov[0][3] = -twoF / Sigma * a * s2;
+    
+            gcov[1][0] = gcov[0][1];
+            gcov[1][1] = (1.0 + twoF / Sigma);
+            gcov[1][3] = -(1.0 + twoF / Sigma) * a * s2;
+    
+            gcov[2][2] = Sigma;
+    
+            gcov[3][0] = gcov[0][3];
+            gcov[3][1] = gcov[1][3];
+            gcov[3][3] = PII / Sigma * s2;
+        }
+
+        // Transform a contravariant vector from BL to KS
+        KOKKOS_INLINE_FUNCTION void vec_from_bl(const GReal Xembed[GR_DIM], const Real vcon_bl[GR_DIM], Real vcon[GR_DIM]) const
+        {
+            const GReal r = Xembed[1];
+
+            const GReal gtt = (1. - 2./m::sqrt(r*r + def_l1*def_l1));
+            const GReal gg = 1.0;
+            const GReal gthth = r*r + def_l1*def_l1;
+    
+            const GReal twoF = (1.0 / m::sqrt(gg) - (gtt / gg)) * gthth;
+            const GReal Delta = gthth * (gtt / gg) + a * a;
+    
+            Real trans[GR_DIM][GR_DIM];
+            DLOOP2 trans[mu][nu] = (mu == nu);
+            trans[0][1] = twoF / Delta;
+            trans[3][1] = a / Delta;
+    
+            gzero(vcon);
+            DLOOP1 {
+                DLOOP2 vcon[mu] += trans[mu][nu] * vcon_bl[nu];
+            }
+        }
+    
+        // Transform a contravariant vector from KS to BL
+        KOKKOS_INLINE_FUNCTION void vec_to_bl(const GReal Xembed[GR_DIM], const Real vcon_bl[GR_DIM], Real vcon[GR_DIM]) const
+        {
+            const GReal r = Xembed[1];
+
+            const GReal gtt =  (1. - 2./m::sqrt(r*r + def_l1*def_l1));
+            const GReal gg = 1.0;
+            const GReal gthth = r*r + def_l1*def_l1;
+
+            const GReal twoF = (1.0 / m::sqrt(gg) - (gtt / gg)) * gthth;
+            const GReal Delta = gthth * (gtt / gg) + a * a;
+    
+            Real trans[GR_DIM][GR_DIM], rtrans[GR_DIM][GR_DIM];
+            DLOOP2 rtrans[mu][nu] = (mu == nu);
+            rtrans[0][1] = twoF / Delta;
+            rtrans[3][1] = a / Delta;
+    
+            invert(&rtrans[0][0], &trans[0][0]);
+
+            gzero(vcon);
+            DLOOP1 {
+                DLOOP2 vcon[mu] += trans[mu][nu] * vcon_bl[nu];
+            }
+        }
+};
+
+
+/**
+ * JNW coordinates in BL form
+ */
+class JNWBLCoords {
+    public:
+        static constexpr char name[] = "JNWBLCoords";
+        const GReal a;
+        const GReal def_gamma;
+        static constexpr bool spherical = true;
+
+        KOKKOS_FUNCTION JNWBLCoords(GReal spin, GReal d_gamma): a(spin), def_gamma(d_gamma) {}
+    
+        KOKKOS_INLINE_FUNCTION void gcov_embed(const GReal Xembed[GR_DIM], Real gcov[GR_DIM][GR_DIM]) const
+        {
+            const GReal r = Xembed[1];
+            const GReal th = excise(excise(Xembed[2], 0.0, SMALL), M_PI, SMALL);
+            const GReal cth = m::cos(th), sth = m::sin(th);
+            const GReal s2 = sth * sth;
+    
+            
+            const GReal gtt =  m::pow((1. - 2./r/def_gamma), def_gamma);
+            const GReal gg = 1.0;
+            const GReal gthth = m::pow((1. - 2./r/def_gamma), 1.-def_gamma)*r*r;
+
+            const GReal twoF = (1.0 / m::sqrt(gg) - (gtt / gg)) * gthth;
+            const GReal Delta = gthth * (gtt / gg) + a * a;
+            const GReal Sigma = gthth / m::sqrt(gg) + a * a * cth * cth;
+            const GReal PII = m::pow(gthth / m::sqrt(gg) + a * a, 2.0) - Delta * a * a * s2;
+    
+            gzero2(gcov);
+
+            gcov[0][0] = -(1. - twoF/Sigma);
+            gcov[0][3] = -twoF/Sigma*a*s2;
+            gcov[3][0] = -twoF/Sigma*a*s2;
+            gcov[1][1] = Sigma/Delta;
+            gcov[2][2] = Sigma;
+            gcov[3][3] = PII/Sigma*s2;
+        }
+};
+
+/**
+ * JNW coordinates in KS form
+ */
+class JNWKSCoords {
+    public:
+        static constexpr char name[] = "JNWKSCoords";
+        const GReal a;
+        const GReal def_gamma;
+        static constexpr bool spherical = true;
+    
+        KOKKOS_FUNCTION JNWKSCoords(GReal spin, GReal d_gamma): a(spin), def_gamma(d_gamma) {}
+        
+        KOKKOS_INLINE_FUNCTION void gcov_embed(const GReal Xembed[GR_DIM], Real gcov[GR_DIM][GR_DIM]) const
+        {
+            const GReal r = Xembed[1];
+            const GReal th = excise(excise(Xembed[2], 0.0, SMALL), M_PI, SMALL);
+            const GReal cth = m::cos(th), sth = m::sin(th);
+            const GReal s2 = sth * sth;
+
+            const GReal gtt =  m::pow((1. - 2./r/def_gamma), def_gamma);
+            const GReal gg = 1.0;
+            const GReal gthth = m::pow((1. - 2./r/def_gamma), 1.-def_gamma)*r*r;
+
+            const GReal twoF = (1.0 / m::sqrt(gg) - (gtt / gg)) * gthth;
+            const GReal Delta = gthth * (gtt / gg) + a * a;
+            const GReal Sigma = gthth / m::sqrt(gg) + a * a * cth * cth;
+            const GReal PII = m::pow(gthth / m::sqrt(gg) + a * a, 2.0) - Delta * a * a * s2;
+    
+            gzero2(gcov);
+    
+            gcov[0][0] = -(1.0 - twoF / Sigma);
+            gcov[0][1] = twoF / Sigma;
+            gcov[0][3] = -twoF / Sigma * a * s2;
+    
+            gcov[1][0] = gcov[0][1];
+            gcov[1][1] = (1.0 + twoF / Sigma);
+            gcov[1][3] = -(1.0 + twoF / Sigma) * a * s2;
+    
+            gcov[2][2] = Sigma;
+    
+            gcov[3][0] = gcov[0][3];
+            gcov[3][1] = gcov[1][3];
+            gcov[3][3] = PII / Sigma * s2;
+        }
+
+        // Transform a contravariant vector from BL to KS
+        KOKKOS_INLINE_FUNCTION void vec_from_bl(const GReal Xembed[GR_DIM], const Real vcon_bl[GR_DIM], Real vcon[GR_DIM]) const
+        {
+            const GReal r = Xembed[1];
+
+            const GReal gtt =  m::pow((1. - 2./r/def_gamma), def_gamma);
+            const GReal gg = 1.0;
+            const GReal gthth = m::pow((1. - 2./r/def_gamma), 1.-def_gamma)*r*r;
+    
+            const GReal twoF = (1.0 / m::sqrt(gg) - (gtt / gg)) * gthth;
+            const GReal Delta = gthth * (gtt / gg) + a * a;
+    
+            Real trans[GR_DIM][GR_DIM];
+            DLOOP2 trans[mu][nu] = (mu == nu);
+            trans[0][1] = twoF / Delta;
+            trans[3][1] = a / Delta;
+    
+            gzero(vcon);
+            DLOOP1 {
+                DLOOP2 vcon[mu] += trans[mu][nu] * vcon_bl[nu];
+            }
+        }
+    
+        // Transform a contravariant vector from KS to BL
+        KOKKOS_INLINE_FUNCTION void vec_to_bl(const GReal Xembed[GR_DIM], const Real vcon_bl[GR_DIM], Real vcon[GR_DIM]) const
+        {
+            const GReal r = Xembed[1];
+
+            const GReal gtt =  m::pow((1. - 2./r/def_gamma), def_gamma);
+            const GReal gg = 1.0;
+            const GReal gthth = m::pow((1. - 2./r/def_gamma), 1.-def_gamma)*r*r;
+
+            const GReal twoF = (1.0 / m::sqrt(gg) - (gtt / gg)) * gthth;
+            const GReal Delta = gthth * (gtt / gg) + a * a;
+    
+            Real trans[GR_DIM][GR_DIM], rtrans[GR_DIM][GR_DIM];
+            DLOOP2 rtrans[mu][nu] = (mu == nu);
+            rtrans[0][1] = twoF / Delta;
+            rtrans[3][1] = a / Delta;
+    
+            invert(&rtrans[0][0], &trans[0][0]);
+
+            gzero(vcon);
+            DLOOP1 {
+                DLOOP2 vcon[mu] += trans[mu][nu] * vcon_bl[nu];
             }
         }
     };
@@ -922,5 +1190,5 @@ class WidepoleTransform {
 // Bundle coordinates and transforms into umbrella variant types
 // These act as a wannabe "interface" or "parent class" with the exception that access requires "mpark::visit"
 // See coordinate_embedding.hpp
-using SomeBaseCoords = mpark::variant<SphMinkowskiCoords, CartMinkowskiCoords, SphBLCoords, SphKSCoords, SphBLExtG, SphKSExtG, JMN1BLCoords, JMN1KSCoords>;
+using SomeBaseCoords = mpark::variant<SphMinkowskiCoords, CartMinkowskiCoords, SphBLCoords, SphKSCoords, SphBLExtG, SphKSExtG, JMN1BLCoords, JMN1KSCoords, SVKSCoords, SVBLCoords,JNWBLCoords, JNWKSCoords>;
 using SomeTransform = mpark::variant<NullTransform, SphNullTransform, ExponentialTransform, SuperExponentialTransform, ModifyTransform, FunkyTransform, WidepoleTransform>;

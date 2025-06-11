@@ -11,8 +11,8 @@ problem_id = torus
 archive_parameters = timestamp
 
 <parthenon/mesh>
-nx1 = 256 
-nx2 = 256
+nx1 = 128 
+nx2 = 128
 nx3 = 64
 
 <parthenon/meshblock>
@@ -22,21 +22,22 @@ nx2 = 64
 nx3 = 64
 
 <coordinates>
-base = spherical_ks
+base = ks_jnw 
 # FMKS coordinates and transmitting polar bounds
 # are not compatible
-transform = mks
+transform = mks 
 r_out = 1000
 a = 0.
 hslope = 0.3
-
+def_gamma = 0.71
+ 
 <parthenon/time>
-tlim = 10000.0
+tlim = 60000.0
 nlim = -1
 
 <torus>
-rin = 10.0
-rmax = 18.0
+rin = 6.0
+rmax = 12.1
 # Tilt in degrees, rotates initial torus CC about +y. YMMV.
 tilt = 0.
 
@@ -96,7 +97,7 @@ flag_verbose = 0
 file_type = hdf5
 dt = 5.0
 single_precision_output = true
-variables = prims, divB, jcon, fflag, pflag, fofcflag
+variables = prims, divB, jcon, fflag, pflag, fofcflag, coords.gcov
 
 <parthenon/output1>
 file_type = rst

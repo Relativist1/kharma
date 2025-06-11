@@ -16,27 +16,28 @@ nx2 = 256
 nx3 = 64
 
 <parthenon/meshblock>
-nx1 = 128
-nx2 = 64
+nx1 = 256
+nx2 = 256
 # Cannot break up phi with transmitting boundaries
 nx3 = 64
 
 <coordinates>
-base = spherical_ks
+base = ks_jmn1 
 # FMKS coordinates and transmitting polar bounds
 # are not compatible
-transform = mks
+transform = mks 
+r_in = 12 
 r_out = 1000
 a = 0.
-hslope = 0.3
-
+hslope = 0.2
+rb = 2.8 
 <parthenon/time>
-tlim = 10000.0
+tlim = 60000.0
 nlim = -1
 
 <torus>
-rin = 10.0
-rmax = 18.0
+rin = 20.0
+rmax = 41.0
 # Tilt in degrees, rotates initial torus CC about +y. YMMV.
 tilt = 0.
 
@@ -46,7 +47,8 @@ u_jitter = 0.04
 <b_field>
 solver = face_ct
 type = mad
-beta_min = 100.
+beta_min = 10.
+kill_on_large_divb = 1e-4
 
 <GRMHD>
 cfl = 0.7

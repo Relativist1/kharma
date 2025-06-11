@@ -102,7 +102,15 @@ class CoordinateEmbedding {
                 base.emplace<JMN1BLCoords>(mpark::get<JMN1BLCoords>(base_in));
             } else if (mpark::holds_alternative<JMN1KSCoords>(base_in)) {
                 base.emplace<JMN1KSCoords>(mpark::get<JMN1KSCoords>(base_in));
-            }
+            } else if (mpark::holds_alternative<SVKSCoords>(base_in)) {
+                base.emplace<SVKSCoords>(mpark::get<SVKSCoords>(base_in));
+            } else if (mpark::holds_alternative<SVBLCoords>(base_in)) {
+                base.emplace<SVBLCoords>(mpark::get<SVBLCoords>(base_in));
+            } else if (mpark::holds_alternative<JNWBLCoords>(base_in)) {
+                base.emplace<JNWBLCoords>(mpark::get<JNWBLCoords>(base_in));
+            } else if (mpark::holds_alternative<JNWKSCoords>(base_in)) {
+                base.emplace<JNWKSCoords>(mpark::get<JNWKSCoords>(base_in));
+            }   
 
             if (mpark::holds_alternative<NullTransform>(transform_in)) {
                 transform.emplace<NullTransform>(mpark::get<NullTransform>(transform_in));
@@ -133,21 +141,30 @@ class CoordinateEmbedding {
             } else if (base_str == "cartesian_minkowski" || base_str == "minkowski") {
                 base.emplace<CartMinkowskiCoords>(CartMinkowskiCoords());
             } else if (base_str == "spherical_ks" || base_str == "ks" ||
-                        base_str == "spherical_ks_extg" || base_str == "ks_extg" || base_str == "ks_jmn1") {
+                       base_str == "spherical_ks_extg" || base_str == "ks_extg" || 
+                       base_str == "ks_jmn1" || base_str == "ks_sv" || base_str == "ks_jnw") {
                 GReal a = pin->GetReal("coordinates", "a");
                 bool ext_g = pin->GetOrAddBoolean("coordinates", "ext_g", false);
+
                 if (ext_g || base_str == "spherical_ks_extg" || base_str == "ks_extg") {
                     if (a > 0) throw std::invalid_argument("Transform is for spherical coordinates!");
                     base.emplace<SphKSExtG>(SphKSExtG(a));
                 } else if(base_str == "ks_jmn1") {
                     GReal rb = pin->GetReal("coordinates", "rb");
                     base.emplace<JMN1KSCoords>(JMN1KSCoords(a, rb));
+                } else if(base_str == "ks_sv") {
+                    GReal def_l1 = pin->GetReal("coordinates", "def_l1");
+                    base.emplace<SVKSCoords>(SVKSCoords(a, def_l1));
+                } else if(base_str == "ks_jnw") {
+                    GReal def_gamma = pin->GetReal("coordinates", "def_gamma");
+                    base.emplace<JNWKSCoords>(JNWKSCoords(a, def_gamma));
                 }
-                 else {
+                else {
                     base.emplace<SphKSCoords>(SphKSCoords(a));
                 }
             } else if (base_str == "spherical_bl" || base_str == "bl" ||
-                        base_str == "spherical_bl_extg" || base_str == "bl_extg" || base_str == "bl_jmn1") {
+                       base_str == "spherical_bl_extg" || base_str == "bl_extg" ||
+                       base_str == "bl_jmn1" || base_str == "bl_sv" || base_str == "bl_jnw") {
                 GReal a = pin->GetReal("coordinates", "a");
                 bool ext_g = pin->GetOrAddBoolean("coordinates", "ext_g", false);
                 if (ext_g || base_str == "spherical_bl_extg" || base_str == "bl_extg") {
@@ -156,7 +173,13 @@ class CoordinateEmbedding {
                 } else if(base_str == "bl_jmn1") {
                     GReal rb = pin->GetReal("coordinates", "rb");
                     base.emplace<JMN1BLCoords>(JMN1BLCoords(a, rb));
-                } else {
+                } else if(base_str == "bl_sv") {
+                    GReal def_l1 = pin->GetReal("coordinates", "def_l1");
+                    base.emplace<SVBLCoords>(SVBLCoords(a, def_l1));
+                } else if(base_str == "bl_jnw") {
+                    GReal def_gamma = pin->GetReal("coordinates", "def_gamma");
+                    base.emplace<JNWBLCoords>(JNWBLCoords(a, def_gamma));
+                }else {
                     base.emplace<SphBLCoords>(SphBLCoords(a));
                 }
             } else {
@@ -263,7 +286,20 @@ class CoordinateEmbedding {
                 mpark::holds_alternative<SphBLExtG>(base)) {
                 const GReal a = get_a();
                 return 1 + m::sqrt(1 - a * a);
-            } else {
+            } else if (mpark::holds_alternative<SVKSCoords>(base) ||
+                       mpark::holds_alternative<SVBLCoords>(base)){
+                const GReal def_l1 = get_def_l1();
+                if (def_l1<2.){
+                    return m::sqrt(4. - def_l1*def_l1);
+                } else if (def_l1>2.){
+                    return 0;
+                } 
+            } else if (mpark::holds_alternative<JNWKSCoords>(base) ||
+                       mpark::holds_alternative<JNWBLCoords>(base)){
+                const GReal def_gamma = get_def_gamma();
+                return 2./def_gamma;
+            }
+            else {
                 return 0.1;
             }
         }
@@ -278,6 +314,15 @@ class CoordinateEmbedding {
             return mpark::get<JMN1KSCoords>(base).def_Rb;
         }
 
+        KOKKOS_INLINE_FUNCTION GReal get_def_l1() const
+        {
+            return mpark::get<SVKSCoords>(base).def_l1;
+        }
+
+        KOKKOS_INLINE_FUNCTION GReal get_def_gamma() const
+        {
+            return mpark::get<JNWKSCoords>(base).def_gamma;
+        }
 
         GReal startx(int dir) const
         {
@@ -609,7 +654,13 @@ class CoordinateEmbedding {
             } else if (mpark::holds_alternative<JMN1KSCoords>(base) ||
                        mpark::holds_alternative<JMN1BLCoords>(base)){
                 JMN1BLCoords(get_a(), get_rb()).gcov_embed(Xembed, gcov_bl);
-            }
+            } else if (mpark::holds_alternative<SVKSCoords>(base) ||
+                       mpark::holds_alternative<SVBLCoords>(base)){
+                SVBLCoords(get_a(), get_rb()).gcov_embed(Xembed, gcov_bl);
+            } else if (mpark::holds_alternative<JNWKSCoords>(base) ||
+                       mpark::holds_alternative<JNWBLCoords>(base)){
+                JNWBLCoords(get_a(), get_rb()).gcov_embed(Xembed, gcov_bl);
+            } 
 
             Real ucon_bl_fourv[GR_DIM];
             DLOOP1 ucon_bl_fourv[mu] = ucon_bl[mu];
@@ -626,6 +677,10 @@ class CoordinateEmbedding {
                 DLOOP1 ucon_base[mu] = ucon_bl_fourv[mu];
             } else if (mpark::holds_alternative<JMN1KSCoords>(base)) {
                 mpark::get<JMN1KSCoords>(base).vec_from_bl(Xembed, ucon_bl_fourv, ucon_base);
+            } else if (mpark::holds_alternative<SVKSCoords>(base)) {
+                mpark::get<SVKSCoords>(base).vec_from_bl(Xembed, ucon_bl_fourv, ucon_base);
+            } else if (mpark::holds_alternative<JNWKSCoords>(base)) {
+                mpark::get<JNWKSCoords>(base).vec_from_bl(Xembed, ucon_bl_fourv, ucon_base);
             }
             // Finally, apply any transform to native coordinates
             con_vec_to_native(Xnative, ucon_base, ucon_native);
