@@ -12,7 +12,7 @@ archive_parameters = timestamp
 
 <parthenon/mesh>
 nx1 = 256 
-nx2 = 256
+nx2 = 256 
 nx3 = 64
 
 <parthenon/meshblock>
@@ -22,21 +22,23 @@ nx2 = 256
 nx3 = 64
 
 <coordinates>
-base = ks_jmn1 
+base = ks_jmn1
 # FMKS coordinates and transmitting polar bounds
 # are not compatible
-transform = mks 
+transform = mks
+r_in = 1.1
 r_out = 1000
 a = 0.
 hslope = 0.3
-rb = 2.8 
+rb = 2.8
+
 <parthenon/time>
-tlim = 60000.0
+tlim = 10000.0
 nlim = -1
 
 <torus>
-rin = 20.0
-rmax = 41.0
+rin = 6.0
+rmax = 12.1
 # Tilt in degrees, rotates initial torus CC about +y. YMMV.
 tilt = 0.
 

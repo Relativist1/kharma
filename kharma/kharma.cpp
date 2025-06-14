@@ -201,28 +201,37 @@ void KHARMA::FixParameters(ParameterInput *pin, bool is_parthenon_restart)
                     GReal Rin = pin->GetReal("coordinates", "r_in");
                     GReal x1min = tmp_coords.r_to_native(Rin);
                     pin->GetOrAddReal("parthenon/mesh", "x1min", x1min);
-                    if (Rin < 2.0){ // warn if there are fewer than 5 zones inside the event horizon
+                    // If we have a horizon and the inner radius is close to it...
+                    if (Rin < 2.0 && tmp_coords.get_horizon() != 0.0) {
+                        // ...warn if there are fewer than 5 zones inside the event horizon
                         GReal dx = (x1max - x1min) / pin->GetInteger("parthenon/mesh", "nx1");
                         if (tmp_coords.X1_to_embed(x1min + 5*dx) > tmp_coords.get_horizon()) {
                             std::cerr << "WARNING: inner radius is near/in the EH, but does not allow 5 zones inside!" << std::endl;
                         }
                     }
                 } else {
-                    int nx1 = pin->GetInteger("parthenon/mesh", "nx1");
-                    // Allow overriding Rhor for bondi_viscous problem
-                    const GReal Rhor = pin->GetOrAddReal("coordinates", "Rhor", tmp_coords.get_horizon());
-                    const GReal x1hor = tmp_coords.r_to_native(Rhor);
+                    if (tmp_coords.get_horizon() == 0.0) {
+                        // No horizon (Minkowski or naked singularity), default to some small x1min
+                        const GReal x1min = 0.1;
+                        pin->GetOrAddReal("parthenon/mesh", "x1min", x1min);
+                        pin->GetOrAddReal("coordinates", "r_in", tmp_coords.X1_to_embed(x1min));
+                    } else {
+                        // 5 zones in the horizon
+                        int nx1 = pin->GetInteger("parthenon/mesh", "nx1");
+                        // Allow overriding Rhor for bondi_viscous problem
+                        const GReal Rhor = pin->GetOrAddReal("coordinates", "Rhor", tmp_coords.get_horizon());
+                        const GReal x1hor = tmp_coords.r_to_native(Rhor);
 
-                    // Set Rin such that we have 5 zones completely inside the event horizon
-                    // If xeh = log(Rhor), xin = log(Rin), and xout = log(Rout),
-                    // then we want xeh = xin + 5.5 * (xout - xin) / N1TOT:
-                    //const GReal x1min = (nx1 * x1hor / 5.5 - x1max) / (-1. + nx1 / 5.5);
-                    const GReal x1min = 0.01;
-                    if (x1min < 0.0) {
-                        throw std::invalid_argument("Not enough radial zones were specified to put 5 zones inside EH!");
+                        // Set Rin such that we have 5 zones completely inside the event horizon
+                        // If xeh = log(Rhor), xin = log(Rin), and xout = log(Rout),
+                        // then we want xeh = xin + 5.5 * (xout - xin) / N1TOT:
+                        const GReal x1min = (nx1 * x1hor / 5.5 - x1max) / (-1. + nx1 / 5.5);
+                        if (x1min < 0.0) {
+                            throw std::invalid_argument("Not enough radial zones were specified to put 5 zones inside EH!");
+                        }
+                        pin->GetOrAddReal("parthenon/mesh", "x1min", x1min);
+                        pin->GetOrAddReal("coordinates", "r_in", tmp_coords.X1_to_embed(x1min));
                     }
-                    pin->GetOrAddReal("parthenon/mesh", "x1min", x1min);
-                    pin->GetOrAddReal("coordinates", "r_in", tmp_coords.X1_to_embed(x1min));
                 }
             }
         } else {
